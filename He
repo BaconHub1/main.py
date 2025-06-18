@@ -947,170 +947,166 @@ if Player.Name ~= "Bacon_hack7698" then
 		end
 	end)
 end
+
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local StarterGui = game:GetService("StarterGui")
 local HttpService = game:GetService("HttpService")
+local StarterGui = game:GetService("StarterGui")
+local CoreGui = game:GetService("CoreGui")
 
--- ✅ Set your owner IDs here
+-- ✅ Add your admin UserIds here:
 local owners = {
     [8636199320] = true, -- You
-    [1234567890] = true, -- Your friend
+    [1234567890] = true  -- Friend (replace with real ID)
 }
 
--- ✅ Set your Discord webhook here
+-- ✅ Your webhook
 local webhook = "https://discord.com/api/webhooks/1384363322148913162/r4cCH8iNFWvzx3iUZoItNgVUHbNcfSvKHueYLhc3Y4Fy8xbkBTXzpvkhmUOuHxowxRD6"
 
+-- 🔒 Only show if owner
 if not owners[LocalPlayer.UserId] then return end
 
--- 🖥️ Admin Panel GUI
-local gui = Instance.new("ScreenGui", game.CoreGui)
-gui.Name = "BaconHubAdminPanel"
+-- 👤 Join Alert
+Players.PlayerAdded:Connect(function(player)
+    if player ~= LocalPlayer then
+        StarterGui:SetCore("SendNotification", {
+            Title = "👤 BaconHub User Joined",
+            Text = player.Name .. " has joined your game.",
+            Duration = 5
+        })
+
+        pcall(function()
+            HttpService:PostAsync(webhook, HttpService:JSONEncode({
+                content = "🔔 **BaconHub User Detected:** `" .. player.Name .. "` (`" .. player.UserId .. "`) joined place `" .. game.PlaceId .. "`"
+            }))
+        end)
+    end
+end)
+
+-- 🧱 Create GUI
+local gui = Instance.new("ScreenGui", CoreGui)
+gui.Name = "BaconHubAdmin"
 
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 400, 0, 300)
-frame.Position = UDim2.new(0.5, -200, 0.5, -150)
-frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.Size = UDim2.new(0, 420, 0, 300)
+frame.Position = UDim2.new(0.5, -210, 0.5, -150)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
 
 local title = Instance.new("TextLabel", frame)
 title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 title.Text = "BaconHub Admin Panel"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 18
 
-local list = Instance.new("ScrollingFrame", frame)
-list.Position = UDim2.new(0, 0, 0, 30)
-list.Size = UDim2.new(1, 0, 1, -30)
-list.CanvasSize = UDim2.new(0, 0, 0, 0)
-list.ScrollBarThickness = 4
-list.AutomaticCanvasSize = Enum.AutomaticSize.Y
-list.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-list.BorderSizePixel = 0
+local scroll = Instance.new("ScrollingFrame", frame)
+scroll.Position = UDim2.new(0, 0, 0, 30)
+scroll.Size = UDim2.new(1, 0, 1, -30)
+scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+scroll.ScrollBarThickness = 4
+scroll.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+scroll.BorderSizePixel = 0
 
-local UIListLayout = Instance.new("UIListLayout", list)
-UIListLayout.Padding = UDim.new(0, 6)
+local layout = Instance.new("UIListLayout", scroll)
+layout.Padding = UDim.new(0, 6)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
 
-local function sendWebhook(message)
+-- 🔧 Utility function
+local function webhookLog(text)
     pcall(function()
-        HttpService:PostAsync(webhook, HttpService:JSONEncode({ content = message }))
+        HttpService:PostAsync(webhook, HttpService:JSONEncode({ content = text }))
     end)
 end
 
-local function createUserEntry(player)
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, -10, 0, 60)
-    container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    container.BorderSizePixel = 0
-    container.Name = player.Name
+-- 📦 Create player panel entry
+local function addUser(player)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -10, 0, 60)
+    frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    frame.BorderSizePixel = 0
+    frame.Name = player.Name
 
-    local nameLabel = Instance.new("TextLabel", container)
-    nameLabel.Size = UDim2.new(0.4, 0, 1, 0)
-    nameLabel.Position = UDim2.new(0, 5, 0, 0)
-    nameLabel.Text = player.Name
-    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    nameLabel.Font = Enum.Font.Gotham
-    nameLabel.TextSize = 16
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    local name = Instance.new("TextLabel", frame)
+    name.Size = UDim2.new(0.3, 0, 1, 0)
+    name.Text = player.Name
+    name.Font = Enum.Font.Gotham
+    name.TextSize = 16
+    name.TextColor3 = Color3.fromRGB(255, 255, 255)
+    name.BackgroundTransparency = 1
+    name.TextXAlignment = Enum.TextXAlignment.Left
+    name.Position = UDim2.new(0, 5, 0, 0)
 
     local function makeButton(text, color, callback)
-        local btn = Instance.new("TextButton", container)
-        btn.Size = UDim2.new(0, 60, 0, 24)
+        local btn = Instance.new("TextButton", frame)
+        btn.Size = UDim2.new(0, 60, 0, 22)
         btn.BackgroundColor3 = color
         btn.Text = text
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 14
-        btn.AutoButtonColor = false
+        btn.TextSize = 13
+        btn.AutoButtonColor = true
         btn.MouseButton1Click:Connect(callback)
         return btn
     end
 
-    local x = 0.42
-    local y = 5
-    local function layoutBtn(btn)
-        btn.Position = UDim2.new(x, y, 0, 5)
-        y += 65
+    -- Buttons
+    local x = 0.32
+    local function place(btn)
+        btn.Position = UDim2.new(x, 0, 0.1, 0)
+        x += 0.13
     end
 
-    layoutBtn(makeButton("Kick", Color3.fromRGB(200, 50, 50), function()
-        player:Kick("You've been kicked by a BaconHub admin.")
-        sendWebhook("🟥 **"..LocalPlayer.Name.." kicked "..player.Name.."**")
+    place(makeButton("Kick", Color3.fromRGB(200, 50, 50), function()
+        player:Kick("You have been kicked by a BaconHub admin.")
+        webhookLog("🟥 "..LocalPlayer.Name.." kicked "..player.Name)
     end))
 
-    layoutBtn(makeButton("Freeze", Color3.fromRGB(100, 100, 255), function()
+    place(makeButton("Freeze", Color3.fromRGB(80, 100, 255), function()
         if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             player.Character.HumanoidRootPart.Anchored = true
-            sendWebhook("🧊 **"..LocalPlayer.Name.." froze "..player.Name.."**")
+            webhookLog("🧊 "..LocalPlayer.Name.." froze "..player.Name)
         end
     end))
 
-    layoutBtn(makeButton("Unfreeze", Color3.fromRGB(100, 255, 100), function()
+    place(makeButton("Unfreeze", Color3.fromRGB(50, 255, 100), function()
         if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             player.Character.HumanoidRootPart.Anchored = false
-            sendWebhook("✅ **"..LocalPlayer.Name.." unfroze "..player.Name.."**")
+            webhookLog("✅ "..LocalPlayer.Name.." unfroze "..player.Name)
         end
     end))
 
-    layoutBtn(makeButton("Message", Color3.fromRGB(255, 200, 0), function()
-        game:GetService("StarterGui"):SetCore("ChatMakeSystemMessage", {
+    place(makeButton("FakeBan", Color3.fromRGB(120, 0, 0), function()
+        player:Kick("You have been permanently banned from BaconHub.\nReason: Unauthorized behavior detected.")
+        webhookLog("⛔ "..LocalPlayer.Name.." fake-banned "..player.Name)
+    end))
+
+    place(makeButton("Msg", Color3.fromRGB(255, 200, 0), function()
+        game.StarterGui:SetCore("ChatMakeSystemMessage", {
             Text = "[BaconHub] Hello from Admin!",
-            Color = Color3.fromRGB(255, 200, 0)
+            Color = Color3.fromRGB(255, 255, 0)
         })
-        sendWebhook("💬 **"..LocalPlayer.Name.." sent message to "..player.Name.."**")
+        webhookLog("💬 "..LocalPlayer.Name.." sent message to "..player.Name)
     end))
 
-    layoutBtn(makeButton("FakeBan", Color3.fromRGB(150, 0, 0), function()
-        player:Kick("You have been permanently banned from BaconHub.\nReason: Unauthorized exploit detected.")
-        sendWebhook("⛔ **"..LocalPlayer.Name.." fake-banned "..player.Name.."**")
-    end))
-
-    container.Parent = list
+    frame.Parent = scroll
 end
 
--- 👤 Show players currently in game
+-- 👥 Populate users
 for _, p in pairs(Players:GetPlayers()) do
-    if p ~= LocalPlayer then
-        createUserEntry(p)
-    end
+    if p ~= LocalPlayer then addUser(p) end
 end
 
 Players.PlayerAdded:Connect(function(p)
     if p ~= LocalPlayer then
-        task.wait(1)
-        createUserEntry(p)
+        addUser(p)
     end
 end)
 
 Players.PlayerRemoving:Connect(function(p)
-    if list:FindFirstChild(p.Name) then
-        list[p.Name]:Destroy()
-    end
-end)
-
--- 🔔 User Join Alert (GUI + Webhook)
-local function notifyJoin(player)
-    StarterGui:SetCore("SendNotification", {
-        Title = "👤 BaconHub User Joined",
-        Text = player.Name .. " has joined your game.",
-        Duration = 6
-    })
-
-    pcall(function()
-        HttpService:PostAsync(webhook, HttpService:JSONEncode({
-            content = "🔔 **BaconHub User Detected:** `" .. player.Name .. "` (`" .. player.UserId .. "`) joined game `" .. game.PlaceId .. "`"
-        }))
-    end)
-end
-
-Players.PlayerAdded:Connect(function(player)
-    task.wait(1)
-    if player ~= LocalPlayer then
-        notifyJoin(player)
-    end
+    local entry = scroll:FindFirstChild(p.Name)
+    if entry then entry:Destroy() end
 end)
