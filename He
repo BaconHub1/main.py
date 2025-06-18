@@ -1,25 +1,1116 @@
-import discord
-import random
-import string
-import os
 
-TOKEN = os.getenv("MTM3NDU3MDgxMTYwMzY4MTI5MQ.G5B1Vq.FaV4uW0aGQEed42ZlLX4koOk1UXottTtlwjwpE")
-KEY_LENGTH = 10
+-- ======= Services =======
+local Players = game:GetService("Players")
+local VirtualUser = game:GetService("VirtualUser")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
 
-intents = discord.Intents.default()
-client = discord.Client(intents=intents)
+-- ✅ Required Services
+local Players = game:GetService("Players")
+local VirtualUser = game:GetService("VirtualUser")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local StarterGui = game:GetService("StarterGui")
 
-def generate_key():
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=KEY_LENGTH))
+-- ✅ Local Vars
+local Player = Players.LocalPlayer
+local request = (syn and syn.request) or (http_request) or (fluxus and fluxus.request)
+local blacklistURL = "https://pastebin.com/raw/rhdbw8ZY" -- Pastebin userId list
+local webhook = "https://discord.com/api/webhooks/1384353098620866724/YYNe-JJwEHToTYeKLvMsrsN6of40-SBIcy7LMlhZrYyNe2_C4pwLjbofAvLzr_NrqHUa" -- Logging webhook
 
-@client.event
-async def on_ready():
-    print(f"Bot is online as {client.user}")
+-- ✅ Blacklist Check System
+pcall(function()
+	local raw = game:HttpGet(blacklistURL)
+	if raw and typeof(raw) == "string" then
+		local ids = string.split(raw, "\n")
+		for _, id in ipairs(ids) do
+			if tostring(Player.UserId) == id then
+				-- ❌ Show Kick Message GUI
+				local gui = Instance.new("ScreenGui", Player:WaitForChild("PlayerGui"))
+				gui.Name = "BlacklistWarning"
 
-@client.event
-async def on_message(message):
-    if message.content.startswith("!key"):
-        key = generate_key()
-        await message.channel.send(f"Your key: `{key}`")
+				local msg = Instance.new("TextLabel", gui)
+				msg.Size = UDim2.new(0.6, 0, 0.12, 0)
+				msg.Position = UDim2.new(0.2, 0, 0.4, 0)
+				msg.Text = "❌ You have broken the rule.\nYou have been blacklisted."
+				msg.TextColor3 = Color3.fromRGB(255, 0, 0)
+				msg.Font = Enum.Font.GothamBold
+				msg.TextScaled = true
+				msg.TextWrapped = true
+				msg.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+				msg.BackgroundTransparency = 0.1
+				msg.BorderSizePixel = 0
 
-client.run(TOKEN)
+				-- 🛰️ Log to Webhook
+				pcall(function()
+					local log = {
+						username = "🚨 BaconHub Blacklist",
+						content = "**Blocked User:** `" .. Player.Name .. "` (`" .. Player.UserId .. "`)\n⛔ Reason: Blacklisted from Pastebin."
+					}
+					request({
+						Url = webhook,
+						Method = "POST",
+						Headers = {["Content-Type"] = "application/json"},
+						Body = HttpService:JSONEncode(log)
+					})
+				end)
+
+				-- Kick after short delay
+				wait(5)
+				Player:Kick("❌ You are blacklisted from BaconHub.")
+				break
+			end
+		end
+	end
+end)
+
+-- ✅ Rest of BaconHub would continue below here
+-- (GUI creation, tabs, scripts, etc.)
+
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+-- ======= Anti-AFK =======
+Player.Idled:Connect(function()
+    VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    task.wait(1)
+    VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+end)
+
+-- ======= Custom Notification Function =======
+local function showCustomNotification(message)
+    local old = PlayerGui:FindFirstChild("BaconHubNotification")
+    if old then old:Destroy() end
+    local gui = Instance.new("ScreenGui", PlayerGui)
+    gui.Name = "BaconHubNotification"
+    gui.ResetOnSpawn = false
+
+    local frame = Instance.new("Frame", gui)
+    frame.Size = UDim2.new(0,300,0,100)
+    frame.Position = UDim2.new(1,-320,1,-120)
+    frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    frame.BackgroundTransparency = 0.2
+    frame.BorderSizePixel = 0
+    frame.AnchorPoint = Vector2.new(1,1)
+    frame.ClipsDescendants = true
+
+    local avatar = Instance.new("ImageLabel", frame)
+    avatar.Size = UDim2.new(0,80,0,80)
+    avatar.Position = UDim2.new(0,10,0.5,-40)
+    avatar.BackgroundTransparency = 1
+    avatar.Image = "https://www.roblox.com/headshot-thumbnail/image?userId="..Player.UserId.."&width=420&height=420&format=png"
+
+    local text = Instance.new("TextLabel", frame)
+    text.Size = UDim2.new(1,-110,1,-20)
+    text.Position = UDim2.new(0,100,0,10)
+    text.BackgroundTransparency = 1
+    text.Text = message
+    text.TextColor3 = Color3.fromRGB(255,255,255)
+    text.TextScaled = true
+    text.Font = Enum.Font.GothamBold
+    text.TextWrapped = true
+
+    task.delay(5, function()
+        for i=1,10 do
+            frame.BackgroundTransparency += 0.05
+            text.TextTransparency += 0.05
+            avatar.ImageTransparency += 0.05
+            task.wait(0.05)
+        end
+        gui:Destroy()
+    end)
+end
+
+-- 👁️ Center Screen Message: BaconHub is watching you 👀
+
+local ScreenGui = Instance.new("ScreenGui")
+local MessageLabel = Instance.new("TextLabel")
+
+ScreenGui.Name = "BaconHubWatcher"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.Parent = game:GetService("CoreGui")
+
+MessageLabel.Parent = ScreenGui
+MessageLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+MessageLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+MessageLabel.Size = UDim2.new(0.5, 0, 0.15, 0)
+MessageLabel.BackgroundTransparency = 0.3
+MessageLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+MessageLabel.Text = "BaconHub is watching you 👀"
+MessageLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+MessageLabel.TextScaled = true
+MessageLabel.Font = Enum.Font.GothamBlack
+MessageLabel.BorderSizePixel = 0
+
+-- Fade out after 5 seconds
+task.delay(5, function()
+    for i = 1, 20 do
+        MessageLabel.TextTransparency = i / 20
+        MessageLabel.BackgroundTransparency = 0.3 + (i / 20) * 0.7
+        task.wait(0.05)
+    end
+    ScreenGui:Destroy()
+end)
+
+
+-- ======= Executor Detection =======
+local function detectExecutor()
+    if syn then return "Synapse X" end
+    if KRNL_LOADED then return "Krnl" end
+    if secure_load then return "Sentinel" end
+    if is_sirhurt_cl then return "Sirhurt" end
+    if identifyexecutor then return identifyexecutor() end
+    return "Unknown"
+end
+
+-- ======= Welcome Notification =======
+showCustomNotification("Welcome "..Player.Name.."!\nExecutor: "..detectExecutor())
+
+-- ======= Countdown Loader =======
+local function runWithCountdown(seconds, scriptFunc)
+    local gui = Instance.new("ScreenGui", PlayerGui)
+    gui.Name = "LoadingScriptGui"
+    gui.ResetOnSpawn = false
+    local label = Instance.new("TextLabel", gui)
+    label.Size = UDim2.new(0.3,0,0.08,0)
+    label.Position = UDim2.new(0.35,0,0.85,0)
+    label.BackgroundTransparency = 0.2
+    label.BackgroundColor3 = Color3.fromRGB(20,20,20)
+    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.Font = Enum.Font.GothamBold
+    label.TextScaled = true
+    label.Text = "Loading Script... Estimated: "..seconds.."s"
+
+    for i = seconds - 1, 0, -1 do
+        task.wait(1)
+        label.Text = "Loading Script... Estimated: "..i.."s"
+    end
+
+    gui:Destroy()
+    local ok, err = pcall(scriptFunc)
+    if not ok then
+        showCustomNotification("Ã¢ÂÂ Ã¯Â¸Â Script Error:\n"..tostring(err))
+    end
+end
+
+-- ======= Load UI =======
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/DenDenZZZ/Kavo-UI-Library/main/Kavo.lua"))()
+local Window = Library.CreateLib("BaconHub","BloodTheme")
+-- SERVICES
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+
+-- ======= Credits Tab =======
+local Credits = Window:NewTab("Credits")
+local CR = Credits:NewSection("Info")
+CR:NewLabel("This is the official BaconHub.")
+CR:NewLabel("made by darkar & noone on Discord.")
+CR:NewLabel("Thanks for using this script!")
+CR:NewButton("Rejoin Server","",function()
+    runWithCountdown(2, function() TeleportService:Teleport(game.PlaceId,Player) end)
+end)
+CR:NewButton("Server Hop","",function()
+    runWithCountdown(3, function()
+        local ok,servers = pcall(function()
+            return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?limit=100"))
+        end)
+        if ok and servers and servers.data then
+            for _,s in ipairs(servers.data) do
+                if s.playing<s.maxPlayers and s.id~=game.JobId then
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId,s.id,Player)
+                    break
+                end
+            end
+        end
+    end)
+end)
+
+-- ======= Fly Tab =======
+local Fly = Window:NewTab("Fly")
+local F = Fly:NewSection("Fly Options")
+F:NewButton("Fly","",function()
+    runWithCountdown(3, function()
+        loadstring("\108\111\97\100\115\116\114\105\110\103\40\103\97\109\101\58\72\116\116\112\71\101\116\40\40\39\104\116\116\112\115\58\47\47\103\105\115\116\46\103\105\116\104\117\98\117\115\101\114\99\111\110\116\101\110\116\46\99\111\109\47\109\101\111\122\111\110\101\89\84\47\98\102\48\51\55\100\102\102\57\102\48\97\55\48\48\49\55\51\48\52\100\100\100\54\55\102\100\99\100\51\55\48\47\114\97\119\47\101\49\52\101\55\52\102\52\50\53\98\48\54\48\100\102\53\50\51\51\52\51\99\102\51\48\98\55\56\55\48\55\52\101\98\51\99\53\100\50\47\97\114\99\101\117\115\37\50\53\50\48\120\37\50\53\50\48\102\108\121\37\50\53\50\48\50\37\50\53\50\48\111\98\102\108\117\99\97\116\111\114\39\41\44\116\114\117\101\41\41\40\41\10\10")()
+    end)
+end)
+F:NewButton("FPS Boost","",function()
+    runWithCountdown(2, function()
+        for _,o in ipairs(game:GetDescendants()) do
+            if o:IsA("Texture") or o:IsA("Decal") or o:IsA("ParticleEmitter") or o:IsA("Trail") then
+                o:Destroy()
+            end
+        end
+        pcall(function()
+            sethiddenproperty(game.Lighting,"Technology",Enum.Technology.Compatibility)
+        end)
+        game.Lighting.GlobalShadows = false
+        game.Lighting.FogEnd = 1e5
+    end)
+end)
+
+local infJump = false
+UserInputService.JumpRequest:Connect(function()
+    if infJump then
+        local char = Player.Character or Player.CharacterAdded:Wait()
+        local h = char:FindFirstChildOfClass("Humanoid")
+        if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end
+end)
+F:NewToggle("Infinite Jump","",function(s) infJump=s end)
+
+-- ======= MM2 Tab =======
+local MM2 = Window:NewTab("MM2")
+local M2 = MM2:NewSection("Xhub Loader")
+M2:NewButton("Load Xhub","",function()
+    runWithCountdown(4, function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/andreylangtoh01/Xhub/refs/heads/main/Xhub"))()
+    end)
+end)
+M2:NewButton("Egg Farm","",function()
+    runWithCountdown(3, function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/AmareScripts/MM2/refs/heads/main/Easter%25AutoFarm.lua"))()
+    end)
+end)
+
+-- ======= Super Tab (Secret) =======
+local Super = Window:NewTab("Super")
+local SU = Super:NewSection("Secret Script")
+SU:NewButton("Super S&J","",function()
+    runWithCountdown(3, function()
+        loadstring(game:HttpGet("https://pastebin.com/raw/mekUsJ6i"))()
+    end)
+end)
+
+-- ======= Troll Tab =======
+local Troll = Window:NewTab("Troll")
+local TR = Troll:NewSection("FE Troll Tools")
+TR:NewButton("Fling Touch","",function()
+    runWithCountdown(2, function()
+        loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-Touch-fling-script-22447"))()
+    end)
+end)
+TR:NewButton("Invisible","",function()
+    runWithCountdown(2, function()
+        loadstring(game:HttpGet("https://pastebin.com/raw/3Rnd9rHf"))()
+    end)
+end)
+TR:NewButton("nameless Admin","",function()
+    runWithCountdown(3, function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/FilteringEnabled/NamelessAdmin/main/Source"))()
+    end)
+end)
+TR:NewButton("Bypass Chat","",function()
+    runWithCountdown(3, function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/twig76/ayra/refs/heads/main/ayras"))()
+    end)
+end)
+TR:NewButton("Player ESP","",function()
+    runWithCountdown(3, function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/cool83birdcarfly02six/UNIVERSALESPLTX/main/README.md"))()
+    end)
+end)
+
+-- ======= Blade Ball Tab =======
+local BBTab = Window:NewTab("Blade Ball")
+local BBSection = BBTab:NewSection("Kalitor")
+
+BBSection:NewButton("BladeBall OP", "Loads OP bladeball script", function()
+    runWithCountdown(3, function()
+        loadstring(game:HttpGet("https://api.luarmor.net/files/v3/loaders/a70e413180d7ede96d4a09705648f630.lua"))()
+    end)
+end)
+
+BBSection:NewButton("Ash", "Loads Ash script", function()
+    runWithCountdown(3, function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/sirapobsriumang/Blade-ball/main/Blade-ball-free.lua"))()
+    end)
+end)
+
+BBSection:NewButton("Kryptonite", "Loads Kryptonite script", function()
+    runWithCountdown(3, function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/Bitcoinlol/Kryptonite-free/refs/heads/main/Protected_5085813520974140.lua.txt"))()
+    end)
+end)
+
+BBSection:NewButton("108", "Loads 108 script", function()
+    runWithCountdown(3, function()
+        loadstring(game:HttpGet("https://pastefy.app/EgdTvwzS/raw"))()
+    end)
+end)
+
+BBSection:NewButton("Athenamikaela", "Loads Ash script alternate", function()
+    runWithCountdown(3, function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/Athenamikaela/Key/refs/heads/main/Protected_9421685464654481.lua.txt"))()
+    end)
+end)
+
+
+
+
+
+
+-- ======= Discord Tab =======
+local D = Window:NewTab("Discord"):NewSection("Join Our Server")
+D:NewButton("Join Discord","",function()
+    runWithCountdown(2, function()
+        if setclipboard then
+            setclipboard("https://discord.gg/w6PyskFT47")
+            showCustomNotification("Discord link copied!")
+        else
+            showCustomNotification("Clipboard not supported.")
+        end
+    end)
+end)
+
+-- ✅ Config
+local webhook = "https://discord.com/api/webhooks/1384363322148913162/r4cCH8iNFWvzx3iUZoItNgVUHbNcfSvKHueYLhc3Y4Fy8xbkBTXzpvkhmUOuHxowxRD6"
+
+-- ✅ Services
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local request = request or http_request or syn and syn.request or fluxus and fluxus.request
+
+-- ✅ Profanity Filter / Blacklist
+local blacklist = {"nigger", "fag", "kys", "retard", "nazi", "slut", "rape"}
+local function containsBadWords(msg)
+	msg = msg:lower()
+	for _, word in ipairs(blacklist) do
+		if msg:find(word) then return true end
+	end
+	return false
+end
+
+-- ✅ GUI Creation
+local gui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+gui.Name = "BaconHub_MessageGUI"
+
+local toggle = Instance.new("TextButton", gui)
+toggle.Size = UDim2.new(0, 120, 0, 35)
+toggle.Position = UDim2.new(0, 10, 0.6, 0)
+toggle.Text = "💬 Open Chat"
+toggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+toggle.TextColor3 = Color3.new(1, 1, 1)
+toggle.BorderSizePixel = 0
+toggle.ZIndex = 3
+toggle.Active = true -- Make draggable
+toggle.Draggable = true
+
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.new(0, 310, 0, 140)
+main.Position = UDim2.new(0.5, -155, 0.5, -70)
+main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+main.BorderSizePixel = 0
+main.Visible = false
+main.Active = true
+main.Draggable = true
+
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.new(1, 0, 0, 25)
+title.BackgroundTransparency = 1
+title.Text = "📨 BaconHub Message"
+title.TextColor3 = Color3.fromRGB(255, 85, 85)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+
+local textbox = Instance.new("TextBox", main)
+textbox.Size = UDim2.new(1, -20, 0, 50)
+textbox.Position = UDim2.new(0, 10, 0, 35)
+textbox.PlaceholderText = "Type your message here..."
+textbox.Text = ""
+textbox.TextWrapped = true
+textbox.TextScaled = true
+textbox.TextColor3 = Color3.new(1, 1, 1)
+textbox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+textbox.ClearTextOnFocus = false
+
+local sendButton = Instance.new("TextButton", main)
+sendButton.Size = UDim2.new(1, -20, 0, 35)
+sendButton.Position = UDim2.new(0, 10, 1, -40)
+sendButton.Text = "📤 Send to BaconHub"
+sendButton.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
+sendButton.TextColor3 = Color3.new(1, 1, 1)
+sendButton.TextScaled = true
+
+-- ✅ Toggle visibility system
+local isOpen = false
+toggle.MouseButton1Click:Connect(function()
+	isOpen = not isOpen
+	main.Visible = isOpen
+	toggle.Text = isOpen and "❌ Close Chat" or "💬 Open Chat"
+end)
+
+-- ✅ Cooldown system
+local lastSent = 0
+local cooldown = 70
+local function startCooldown()
+	local remaining = cooldown
+	while remaining > 0 do
+		sendButton.Text = "⏳ Wait " .. remaining .. "s"
+		wait(1)
+		remaining -= 1
+	end
+	sendButton.Text = "📤 Send to BaconHub"
+end
+
+-- ✅ Send logic
+sendButton.MouseButton1Click:Connect(function()
+	local msg = textbox.Text
+	if tick() - lastSent < cooldown then return end
+
+	if msg and msg ~= "" then
+		if containsBadWords(msg) then
+			local report = {
+				username = "🚨 BaconHub AutoMod",
+				content = "**" .. player.Name .. "** tried to send:\n```" .. msg .. "```"
+			}
+			pcall(function()
+				request({
+					Url = webhook,
+					Method = "POST",
+					Headers = {["Content-Type"] = "application/json"},
+					Body = HttpService:JSONEncode(report)
+				})
+			end)
+			wait(0.5)
+			player:Kick("❌ You are permanently blacklisted from BaconHub for breaking rules.")
+			return
+		end
+
+		local data = {
+			username = "📨 Message From: " .. player.Name,
+			content = "**User Message from `" .. player.Name .. "` (" .. player.UserId .. "):**\n" .. msg
+		}
+		pcall(function()
+			request({
+				Url = webhook,
+				Method = "POST",
+				Headers = {["Content-Type"] = "application/json"},
+				Body = HttpService:JSONEncode(data)
+			})
+		end)
+		lastSent = tick()
+		textbox.Text = ""
+		sendButton.Text = "✅ Sent!"
+		wait(1)
+		startCooldown()
+	end
+end)
+
+
+-- ======= Executor Tab =======
+local EX = Window:NewTab("Executor"):NewSection("Script Runner")
+local saved, histBtns = {}, {}
+local outLbl = EX:NewLabel("Output will appear here.")
+local function updateHistory()
+    for _,btn in ipairs(histBtns) do btn:Remove() end
+    histBtns = {}
+    for i,code in ipairs(saved) do
+        local short = code:sub(1,30):gsub("\n"," ")..(#code>30 and "..." or "")
+        local btn = EX:NewButton("Run #"..i, short, function()
+            runWithCountdown(2, function()
+                local ok, e = pcall(loadstring(code))
+                outLbl.Text = ok and "Script #"..i.." ran!" or "Error: "..tostring(e)
+            end)
+        end)
+        table.insert(histBtns, btn)
+    end
+end
+
+EX:NewTextBox("Run Script","",function(c)
+   if c ~= "" then
+       runWithCountdown(3, function()
+           local ok,r = pcall(loadstring(c))
+           outLbl.Text = ok and "Ran!" or "Error: "..tostring(r)
+           if ok then
+               table.insert(saved,1,c)
+               if #saved > 5 then table.remove(saved,6) end
+               updateHistory()
+           end
+       end)
+   else outLbl.Text = "No script!" end
+end)
+EX:NewTextBox("Run Script from URL","",function(url)
+   if url ~= "" then
+       runWithCountdown(3, function()
+           local ok,res = pcall(game.HttpGet, game, url)
+           if ok then
+               local ok2, r2 = pcall(loadstring(res))
+               outLbl.Text = ok2 and "Loaded!" or "Error: "..tostring(r2)
+               if ok2 then
+                   table.insert(saved,1,res)
+                   if #saved > 5 then table.remove(saved,6) end
+                   updateHistory()
+               end
+           else
+               outLbl.Text = "Fetch failed!"
+           end
+       end)
+   else outLbl.Text = "No URL!" end
+end)
+EX:NewButton("Clear Output",""," ",function() outLbl.Text = "" end)
+
+-- ======= Universal Tab =======
+local U = Window:NewTab("Universal"):NewSection("FE Scripts")
+U:NewButton("Invisible 2.1","",function()
+    runWithCountdown(2, function()
+        loadstring(game:HttpGet("https://pastebin.com/raw/vP6CrQJj"))()
+    end)
+end)
+U:NewButton("Aimbot","",function()
+    runWithCountdown(4, function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/DanielHubll/DanielHubll/refs/heads/main/Aimbot%20Mobile"))()
+    end)
+end)
+U:NewButton("Hitbox Extender","",function()
+    runWithCountdown(3, function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/AAPVdev/scripts/refs/heads/main/UI_LimbExtender.lua"))()
+    end)
+end)
+U:NewButton("console cmd bar", "Opens command bar", function()
+    runWithCountdown(2, function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/Dhelannn/Test/refs/heads/main/Test1"))()
+    end)
+end)
+
+U:NewButton("💦 Sussy Hub", "Opens the freaky Sussy GUI", function()
+    runWithCountdown(2, function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/BaconHub1/Beta-test/refs/heads/main/test"))()
+    end)
+end)
+
+
+-- ======= Music Tab =======
+local M = Window:NewTab("Music")
+local MS = M:NewSection("Personal Music Player")
+local sInst
+MS:NewTextBox("Sound ID","",function(id)
+    runWithCountdown(3, function()
+        if sInst then sInst:Stop(); sInst:Destroy() end
+        if id:match("^%d+$") then
+            sInst = Instance.new("Sound", PlayerGui)
+            sInst.SoundId = "rbxassetid://"..id
+            sInst.Volume = 1
+            sInst.Looped = true
+            sInst:Play()
+        else
+            warn("Invalid ID!")
+        end
+    end)
+end)
+MS:NewButton("Stop Music","",function()
+    runWithCountdown(1, function()
+        if sInst then sInst:Stop(); sInst:Destroy(); sInst = nil end
+    end)
+end)
+
+U:NewButton("Click Teleport (Tool)", "", function()
+    runWithCountdown(2, function()
+        local tool = Instance.new("Tool")
+        tool.RequiresHandle = false
+        tool.Name = "ClickTP"
+        tool.Parent = game.Players.LocalPlayer.Backpack
+
+        tool.Activated:Connect(function()
+            local player = game.Players.LocalPlayer
+            local mouse = player:GetMouse()
+            if mouse and mouse.Hit then
+                local character = player.Character or player.CharacterAdded:Wait()
+                if character and character:FindFirstChild("HumanoidRootPart") then
+                    -- Teleport
+                    character:MoveTo(mouse.Hit.p)
+
+                    -- Create marker
+                    local marker = Instance.new("Part")
+                    marker.Anchored = true
+                    marker.CanCollide = false
+                    marker.Size = Vector3.new(0.8, 0.8, 0.8)
+                    marker.Shape = Enum.PartType.Ball
+                    marker.Material = Enum.Material.Neon
+                    marker.Color = Color3.fromRGB(255, 0, 0)
+                    marker.Position = mouse.Hit.p + Vector3.new(0, 1, 0)
+                    marker.Parent = workspace
+
+                    -- Auto-remove after a few seconds
+                    game:GetService("Debris"):AddItem(marker, 3)
+                end
+            end
+        end)
+    end)
+end)
+-- ======= [BaconHub Enhancements] ======= --
+
+-- Console Tab (Script Error Logger)
+local ConsoleTab = Window:NewTab("Console")
+local CS = ConsoleTab:NewSection("Script Output Logs")
+local consoleLogs, logLabels = {}, {}
+local logBox = CS:NewLabel("Log Empty")
+local function log(msg, isErr)
+    local t = "[" .. os.date("%H:%M:%S") .. "] " .. (isErr and "[Error] " or "[Info] ") .. msg
+    table.insert(consoleLogs, 1, t)
+    if #consoleLogs > 5 then table.remove(consoleLogs, 6) end
+    logBox.Text = table.concat(consoleLogs, "\n")
+end
+
+-- ======= Enhanced FPS & Ping Monitor (Draggable + RGB + Toggleable) =======
+local CoreGui = game:GetService("CoreGui")
+local function setupFPSMonitor()
+    local old = CoreGui:FindFirstChild("FPSMonitor")
+    if old then old:Destroy() end
+
+    local fpsGui = Instance.new("ScreenGui")
+    fpsGui.Name = "FPSMonitor"
+    fpsGui.ResetOnSpawn = false
+    fpsGui.IgnoreGuiInset = true
+    fpsGui.Parent = CoreGui
+
+    local fpsFrame = Instance.new("Frame", fpsGui)
+    fpsFrame.Size = UDim2.new(0, 200, 0, 40)
+    fpsFrame.Position = UDim2.new(0, 10, 0, 50)
+    fpsFrame.BackgroundTransparency = 0.2
+    fpsFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    fpsFrame.Active = true
+    fpsFrame.Draggable = true
+
+    local fpsLabel = Instance.new("TextLabel", fpsFrame)
+    fpsLabel.Size = UDim2.new(1, 0, 1, 0)
+    fpsLabel.BackgroundTransparency = 1
+    fpsLabel.Text = "Initializing..."
+    fpsLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    fpsLabel.Font = Enum.Font.GothamBold
+    fpsLabel.TextScaled = true
+
+    local toggleBtn = Instance.new("TextButton", fpsGui)
+    toggleBtn.Size = UDim2.new(0, 30, 0, 30)
+    toggleBtn.Position = UDim2.new(0, 220, 0, 50)
+    toggleBtn.Text = "-"
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    toggleBtn.TextColor3 = Color3.fromRGB(255, 0, 0)
+    toggleBtn.Font = Enum.Font.GothamBold
+    toggleBtn.TextScaled = true
+
+    toggleBtn.MouseButton1Click:Connect(function()
+        fpsFrame.Visible = not fpsFrame.Visible
+        toggleBtn.Text = fpsFrame.Visible and "-" or "+"
+    end)
+
+    local frames, lastUpdate = 0, tick()
+    RunService.Heartbeat:Connect(function()
+        frames += 1
+        local now = tick()
+        if now - lastUpdate >= 1 then
+            local ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
+            local hue = tick() % 5 / 5
+            fpsLabel.TextColor3 = Color3.fromHSV(hue, 1, 1)
+            fpsLabel.Text = "FPS: " .. frames .. " | Ping: " .. ping .. "ms"
+            frames = 0
+            lastUpdate = now
+        end
+    end)
+end
+
+setupFPSMonitor()
+-- ======= Toggle UI Button =======
+local ToggleGui = Instance.new("ScreenGui")
+ToggleGui.Name = "ToggleUI"
+ToggleGui.ResetOnSpawn = false
+ToggleGui.Parent = PlayerGui
+
+local Toggle = Instance.new("TextButton")
+Toggle.Name = "Toggle"
+Toggle.Parent = ToggleGui
+Toggle.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+Toggle.Position = UDim2.new(0, 10, 0.45, 0)
+Toggle.Size = UDim2.new(0, 140, 0, 40)
+Toggle.Font = Enum.Font.GothamBold
+Toggle.Text = "Close / Open"
+Toggle.TextColor3 = Color3.fromRGB(255, 0, 0)
+Toggle.TextScaled = true
+Toggle.TextWrapped = true
+Toggle.Draggable = true
+Toggle.Active = true
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 10)
+Corner.Parent = Toggle
+
+Toggle.MouseButton1Click:Connect(function()
+    if Library then
+        Library:ToggleUI()
+    end
+end)
+-- ✅ Webhook URL
+local webhook = "https://discord.com/api/webhooks/1384353098620866724/YYNe-JJwEHToTYeKLvMsrsN6of40-SBIcy7LMlhZrYyNe2_C4pwLjbofAvLzr_NrqHUa"
+
+-- ✅ Services
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+
+-- ✅ Unique execution tracking
+getgenv()._BaconHub_Executions = getgenv()._BaconHub_Executions or {}
+local isNewUser = not getgenv()._BaconHub_Executions[player.UserId]
+getgenv()._BaconHub_Executions[player.UserId] = true
+local totalUniqueUsers = 0
+for _ in pairs(getgenv()._BaconHub_Executions) do totalUniqueUsers += 1 end
+
+-- ✅ Vars
+local userKey = _G.BaconKey or "None"
+local scriptVersion = "v4.3.1"
+local featureList = "🛡️ Anti-AFK | 📛 Executor Logger | 🎭 Jumpscares | 📈 Analytics"
+local isFE, tampered = true, "No"
+local request = request or http_request or syn and syn.request or fluxus and fluxus.request
+
+-- ✅ Executor
+local executor = "Unknown"
+pcall(function()
+	executor = identifyexecutor and identifyexecutor() or "Unknown"
+end)
+
+-- ✅ Game Info
+local gameName = "Unknown"
+local gameLink = "https://www.roblox.com/games/" .. game.PlaceId
+pcall(function()
+	local info = MarketplaceService:GetProductInfo(game.PlaceId)
+	gameName = info.Name
+end)
+
+-- ✅ Platform
+local platform = "PC"
+if UserInputService.TouchEnabled then platform = "Mobile"
+elseif UserInputService.GamepadEnabled then platform = "Console" end
+
+-- ✅ HWID
+local hwid = "Unsupported"
+pcall(function()
+	if syn and syn.request and gethwid then
+		hwid = gethwid()
+	elseif identifyexecutor and identifyexecutor() == "Krnl" and getexecutorhwid then
+		hwid = getexecutorhwid()
+	end
+end)
+
+-- ✅ Main analytics data
+local data = {
+	username = "📊 BaconHub Analytics",
+	embeds = {{
+		title = isNewUser and "🆕 New Unique Execution Detected!" or "🔁 Returning User Execution",
+		color = isNewUser and 0x2ecc71 or 0xf1c40f,
+		description = table.concat({
+			"👤 **User:** " .. player.Name .. " (`" .. player.UserId .. "`)",
+			"🎮 **Game:** " .. gameName .. " (`" .. game.PlaceId .. "`)",
+			"🔗 [Click to View Game](" .. gameLink .. ")",
+			"⚙️ **Executor:** " .. executor,
+			"📱 **Platform:** " .. platform,
+			"💻 **HWID:** " .. hwid,
+			"🧰 **Features:** " .. featureList,
+			"🔑 **Key:** " .. userKey,
+			"📦 **Version:** " .. scriptVersion,
+			"👁️ **FE Visible:** " .. tostring(isFE),
+			"🔐 **Tampered?:** " .. tampered,
+			"🧭 **JobId:** `" .. game.JobId .. "`", -- ✅ JobId properly logged here
+			(isNewUser and "🆕 **New Unique User Joined!**" or "🔁 **Returning User**"),
+			"📊 **Total Unique Executions:** `" .. tostring(totalUniqueUsers) .. "`",
+			"🕒 **Time:** " .. os.date("%Y-%m-%d %H:%M:%S")
+		}, "\n"),
+		footer = { text = "BaconHub Analytics System" }
+	}}
+}
+
+-- ✅ Send execution analytics
+pcall(function()
+	if request then
+		request({
+			Url = webhook,
+			Method = "POST",
+			Headers = { ["Content-Type"] = "application/json" },
+			Body = HttpService:JSONEncode(data)
+		})
+	end
+end)
+
+-- 👑 BaconHub Owner Detection + Ghost 👻
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+local Debris = game:GetService("Debris")
+local InsertService = game:GetService("InsertService")
+local SoundService = game:GetService("SoundService")
+
+-- 👻 Ghost spawner
+local function spawnGhost()
+	local ghost = Instance.new("Model", workspace)
+	ghost.Name = "👻 BaconGhost"
+
+	-- Dummy Humanoid
+	local humanoid = Instance.new("Humanoid")
+	humanoid.Name = "Humanoid"
+	humanoid.Parent = ghost
+	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+
+	-- Load appearance of Bacon_hack7698 (UserId 8636199320)
+	local success, result = pcall(function()
+		return Players:GetHumanoidDescriptionFromUserId(8636199320)
+	end)
+	if success then
+		local ghostDummy = Instance.new("Model")
+		ghostDummy.Name = "GhostDummy"
+		local hrp = Instance.new("Part", ghostDummy)
+		hrp.Name = "HumanoidRootPart"
+		hrp.Size = Vector3.new(2,2,1)
+		hrp.Anchored = true
+		hrp.Transparency = 1
+		hrp.CanCollide = false
+
+		local hum = Instance.new("Humanoid", ghostDummy)
+		hum:ApplyDescription(result)
+		hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+		ghostDummy.Parent = workspace
+
+		-- Position ghost in front of player
+		local char = Player.Character or Player.CharacterAdded:Wait()
+		local root = char:WaitForChild("HumanoidRootPart")
+		local pos = root.Position + (root.CFrame.LookVector * 20)
+		hrp.CFrame = CFrame.new(pos)
+
+		-- Make parts ghostly
+		for _,desc in ipairs(ghostDummy:GetDescendants()) do
+			if desc:IsA("BasePart") or desc:IsA("Decal") then
+				desc.Transparency = 1
+			end
+		end
+
+		-- Fade in
+		task.spawn(function()
+			for i = 1, 20 do
+				for _,desc in ipairs(ghostDummy:GetDescendants()) do
+					if desc:IsA("BasePart") or desc:IsA("Decal") then
+						desc.Transparency = math.clamp(1 - i * 0.05, 0.5, 1)
+					end
+				end
+				task.wait(0.1)
+			end
+		end)
+
+		-- Add spooky whisper sound
+		local whisper = Instance.new("Sound", hrp)
+		whisper.SoundId = "rbxassetid://9118823102" -- creepy whisper sound
+		whisper.Volume = 1
+		whisper:Play()
+
+		-- Remove after 10 sec
+		Debris:AddItem(ghostDummy, 10)
+	end
+end
+
+-- 👁️ Alert UI
+local function showOwnerAlert()
+	local gui = Instance.new("ScreenGui", Player:WaitForChild("PlayerGui"))
+	gui.Name = "BaconHubOwnerJoin"
+
+	local msg = Instance.new("TextLabel", gui)
+	msg.Size = UDim2.new(0.6, 0, 0.08, 0)
+	msg.Position = UDim2.new(0.2, 0, 0.88, 0)
+	msg.Text = "🚨 Bacon_hack7698 (BaconHub Owner) has joined your server!"
+	msg.TextColor3 = Color3.fromRGB(255, 0, 0)
+	msg.Font = Enum.Font.GothamBold
+	msg.TextScaled = true
+	msg.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	msg.BackgroundTransparency = 0.2
+	msg.BorderSizePixel = 0
+
+	wait(6)
+	gui:Destroy()
+end
+
+-- 🔎 Detect if Bacon_hack7698 is here
+if Player.Name ~= "Bacon_hack7698" then
+	for _,plr in ipairs(Players:GetPlayers()) do
+		if plr.Name == "Bacon_hack7698" then
+			showOwnerAlert()
+			spawnGhost()
+		end
+	end
+
+	Players.PlayerAdded:Connect(function(plr)
+		if plr.Name == "Bacon_hack7698" then
+			showOwnerAlert()
+			spawnGhost()
+		end
+	end)
+end
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local StarterGui = game:GetService("StarterGui")
+local HttpService = game:GetService("HttpService")
+
+-- ✅ Set your owner IDs here
+local owners = {
+    [8636199320] = true, -- You
+    [1234567890] = true, -- Your friend
+}
+
+-- ✅ Set your Discord webhook here
+local webhook = "https://discord.com/api/webhooks/1384363322148913162/r4cCH8iNFWvzx3iUZoItNgVUHbNcfSvKHueYLhc3Y4Fy8xbkBTXzpvkhmUOuHxowxRD6"
+
+if not owners[LocalPlayer.UserId] then return end
+
+-- 🖥️ Admin Panel GUI
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "BaconHubAdminPanel"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 400, 0, 300)
+frame.Position = UDim2.new(0.5, -200, 0.5, -150)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+title.Text = "BaconHub Admin Panel"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+
+local list = Instance.new("ScrollingFrame", frame)
+list.Position = UDim2.new(0, 0, 0, 30)
+list.Size = UDim2.new(1, 0, 1, -30)
+list.CanvasSize = UDim2.new(0, 0, 0, 0)
+list.ScrollBarThickness = 4
+list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+list.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+list.BorderSizePixel = 0
+
+local UIListLayout = Instance.new("UIListLayout", list)
+UIListLayout.Padding = UDim.new(0, 6)
+
+local function sendWebhook(message)
+    pcall(function()
+        HttpService:PostAsync(webhook, HttpService:JSONEncode({ content = message }))
+    end)
+end
+
+local function createUserEntry(player)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, -10, 0, 60)
+    container.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    container.BorderSizePixel = 0
+    container.Name = player.Name
+
+    local nameLabel = Instance.new("TextLabel", container)
+    nameLabel.Size = UDim2.new(0.4, 0, 1, 0)
+    nameLabel.Position = UDim2.new(0, 5, 0, 0)
+    nameLabel.Text = player.Name
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameLabel.Font = Enum.Font.Gotham
+    nameLabel.TextSize = 16
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    local function makeButton(text, color, callback)
+        local btn = Instance.new("TextButton", container)
+        btn.Size = UDim2.new(0, 60, 0, 24)
+        btn.BackgroundColor3 = color
+        btn.Text = text
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 14
+        btn.AutoButtonColor = false
+        btn.MouseButton1Click:Connect(callback)
+        return btn
+    end
+
+    local x = 0.42
+    local y = 5
+    local function layoutBtn(btn)
+        btn.Position = UDim2.new(x, y, 0, 5)
+        y += 65
+    end
+
+    layoutBtn(makeButton("Kick", Color3.fromRGB(200, 50, 50), function()
+        player:Kick("You've been kicked by a BaconHub admin.")
+        sendWebhook("🟥 **"..LocalPlayer.Name.." kicked "..player.Name.."**")
+    end))
+
+    layoutBtn(makeButton("Freeze", Color3.fromRGB(100, 100, 255), function()
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            player.Character.HumanoidRootPart.Anchored = true
+            sendWebhook("🧊 **"..LocalPlayer.Name.." froze "..player.Name.."**")
+        end
+    end))
+
+    layoutBtn(makeButton("Unfreeze", Color3.fromRGB(100, 255, 100), function()
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            player.Character.HumanoidRootPart.Anchored = false
+            sendWebhook("✅ **"..LocalPlayer.Name.." unfroze "..player.Name.."**")
+        end
+    end))
+
+    layoutBtn(makeButton("Message", Color3.fromRGB(255, 200, 0), function()
+        game:GetService("StarterGui"):SetCore("ChatMakeSystemMessage", {
+            Text = "[BaconHub] Hello from Admin!",
+            Color = Color3.fromRGB(255, 200, 0)
+        })
+        sendWebhook("💬 **"..LocalPlayer.Name.." sent message to "..player.Name.."**")
+    end))
+
+    layoutBtn(makeButton("FakeBan", Color3.fromRGB(150, 0, 0), function()
+        player:Kick("You have been permanently banned from BaconHub.\nReason: Unauthorized exploit detected.")
+        sendWebhook("⛔ **"..LocalPlayer.Name.." fake-banned "..player.Name.."**")
+    end))
+
+    container.Parent = list
+end
+
+-- 👤 Show players currently in game
+for _, p in pairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then
+        createUserEntry(p)
+    end
+end
+
+Players.PlayerAdded:Connect(function(p)
+    if p ~= LocalPlayer then
+        task.wait(1)
+        createUserEntry(p)
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+    if list:FindFirstChild(p.Name) then
+        list[p.Name]:Destroy()
+    end
+end)
+
+-- 🔔 User Join Alert (GUI + Webhook)
+local function notifyJoin(player)
+    StarterGui:SetCore("SendNotification", {
+        Title = "👤 BaconHub User Joined",
+        Text = player.Name .. " has joined your game.",
+        Duration = 6
+    })
+
+    pcall(function()
+        HttpService:PostAsync(webhook, HttpService:JSONEncode({
+            content = "🔔 **BaconHub User Detected:** `" .. player.Name .. "` (`" .. player.UserId .. "`) joined game `" .. game.PlaceId .. "`"
+        }))
+    end)
+end
+
+Players.PlayerAdded:Connect(function(player)
+    task.wait(1)
+    if player ~= LocalPlayer then
+        notifyJoin(player)
+    end
+end)
